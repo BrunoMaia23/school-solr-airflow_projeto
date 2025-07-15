@@ -1,77 +1,113 @@
-📊 Pipeline Airflow + Solr + Docker
-Este projeto implementa um pipeline de dados que formata um CSV de alunos e insere os dados no Apache Solr, com orquestração via Apache Airflow. Tudo é executado em containers Docker.
+# Pipeline Airflow + Solr + Docker
 
-🚀 Tecnologias utilizadas
-Python (pandas, pysolr)
+Este projeto implementa um **pipeline de dados** que formata um CSV de alunos e insere os registros no **Apache Solr**, orquestrado pelo **Apache Airflow**. Toda a infraestrutura roda em containers Docker para facilitar o deploy e garantir portabilidade.
 
-Apache Airflow
+---
 
-Apache Solr
+## 🚀 Tecnologias Utilizadas
 
-Docker e Docker Compose
+- **Python**: pandas, pysolr
+- **Apache Airflow** (CeleryExecutor)
+- **Apache Solr**
+- **Docker & Docker Compose**
+- **PostgreSQL** (metastore do Airflow)
+- **Redis** (broker Celery)
 
-PostgreSQL e Redis para backend do Airflow
+---
 
-📁 Estrutura do projeto
+## 📁 Estrutura do Projeto
+
+```
 school-solr-airflow/
 ├── airflow/
-│ ├── dags/ → arquivo da DAG solr_pipeline_dag.py
-│ ├── logs/
-│ ├── plugins/
-├── data/ → alunos.csv e alunos_clean.csv
-├── docker/ → docker-compose-airflow.yml, docker-compose-solr.yml e requirements.txt 
-├── scripts/ → scripts Python de formatação e carregamento
-└── README.md
+│   ├── dags/                # Definição da DAG (solr_pipeline_dag.py)
+│   ├── logs/                # Logs gerados pelo Airflow
+│   └── plugins/             # Plugins do Airflow (vazio por padrão)
+├── data/                    # Dados de entrada e saída
+│   ├── alunos.csv           # CSV original com dados dos alunos
+│   └── alunos_clean.csv     # CSV gerado pela task de formatação
+├── docker/                  # Arquivos Docker Compose e requirements
+│   ├── docker-compose-airflow.yml
+│   ├── docker-compose-solr.yml
+│   └── requirements.txt     # pandas, pysolr
+├── scripts/                 # Scripts Python das tasks
+│   ├── format_csv.py        # Formatação e limpeza do CSV
+│   └── load_to_solr.py      # Inserção dos dados no Solr
+└── README.md                # Este arquivo
+```
 
-📦 Pré-requisitos
-Docker instalado
+---
 
-docker-compose instalado
+## 📦 Pré-requisitos
 
-🛠️ Como executar o pipeline
-Clone o repositório:
+Antes de iniciar, instale:
 
-git clone https://github.com/seu-usuario/school-solr-airflow.git
-cd school-solr-airflow
+- [Docker Desktop](https://www.docker.com/products/docker-desktop)
+- [Docker Compose](https://docs.docker.com/compose/install/)
 
-Coloque o arquivo alunos.csv na pasta data/
+---
 
-Inicie os containers:
+## 🛠️ Como Executar
 
-docker-compose up --build -d
+1. **Clone o repositório**
+   ```bash
+   git clone https://github.com/BrunoMaia23/school-solr-airflow_projeto.git
+   cd school-solr-airflow_projeto
+   ```
 
-Acesse:
+2. **Copie o CSV de alunos**
+   - Coloque o arquivo `alunos.csv` na pasta `data/`
 
-Airflow: http://localhost:8080 (usuário: admin / senha: admin)
+3. **Suba os containers**
+   ```bash
+   cd docker
+   docker-compose -f docker-compose-solr.yml up -d   # Solr
+   docker-compose -f docker-compose-airflow.yml up --build -d  # Airflow + Celery
+   ```
 
-Solr: http://localhost:8983/solr
+4. **Acesse as interfaces**
+   - **Airflow UI**: http://localhost:8080  
+     Usuário: `admin` / Senha: `admin`
+   - **Solr Admin**: http://localhost:8983/solr
 
-No Airflow:
+5. **Execute o pipeline**
+   - Na Airflow UI, ative a DAG `solr_pipeline` (toggle On)
+   - Clique em **Trigger DAG**
 
-Ative a DAG solr_pipeline
+6. **Verifique no Solr**
+   - No Solr Admin, selecione a **collection** `alunos_collection`  
+   - Clique em **Query** e execute sem filtros (`q=*:*`)  
+   - Você verá os documentos inseridos pelo pipeline
 
-Clique em Trigger DAG
+---
 
-Verifique os dados no Solr acessando a collection alunos_collection e rodando a query:
+## 🧪 Descrição dos Scripts
 
-q=:&indent=true
+- **scripts/format_csv.py**  
+  - Lê `alunos.csv` com pandas
+  - Remove linhas com campos obrigatórios vazios
+  - Padroniza nomes e converte datas
+  - Calcula idade a partir de `Data de Nascimento`
+  - Salva o CSV limpo em `alunos_clean.csv`
 
-Você verá os documentos inseridos.
+- **scripts/load_to_solr.py**  
+  - Lê `alunos_clean.csv`
+  - Constrói documentos no formato esperado pelo Solr
+  - Conecta ao Solr via pysolr e insere os documentos
 
-🧪 Scripts
-format_csv.py → faz limpeza e normalização dos dados, usando pandas
+---
 
-load_to_solr.py → carrega os dados para o Solr, usando pysolr
+## 📝 Observações
 
-📝 Observações
-As tarefas são orquestradas com Airflow usando CeleryExecutor
+- **Executor**: utiliza CeleryExecutor para escalabilidade das tasks
+- **Tratamento de erros**: validações no Python para dados faltantes e logging de falhas
+- **Dependências**: listadas em `docker/requirements.txt`
 
-O pipeline trata erros simples (valores nulos, campos mal formatados)
+---
 
-Requisitos estão em requirements.txt
+## ✅ Autor
 
-✅ Autor
-Este projeto foi desenvolvido para fins de avaliação técnica.
-
-👤 Bruno Maia
+**Bruno Maia**  
 📧 brunomaia2304@gmail.com
+
+Este projeto foi desenvolvido para atender ao desafio técnico de **Importação de Dados para o Solr com Orquestração via Airflow**.
