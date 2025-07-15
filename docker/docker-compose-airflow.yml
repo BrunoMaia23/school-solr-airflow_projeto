@@ -1,0 +1,118 @@
+version: '3'
+services:
+
+  postgres:
+    platform: linux/amd64
+    image: postgres:13
+    container_name: docker-postgres-1
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 10s
+      retries: 5
+
+  redis:
+    platform: linux/amd64
+    image: redis:latest
+    container_name: docker-redis-1
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 5
+
+  solr:
+    image: solr:8.11
+    container_name: solr_instance
+    ports:
+      - "8983:8983"
+    volumes:
+      - solr_data:/var/solr
+    command:
+      - solr-precreate
+      - alunos_collection
+
+  airflow:
+    platform: linux/amd64
+    image: apache/airflow:2.5.1
+    container_name: docker-airflow-1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      solr:
+        condition: service_started
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__FERNET_KEY=1FLtxEd86qp5JsDbDJz9M0eZ7dLErNfTR79Bp22yX60=
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    volumes:
+      - ../airflow/dags:/opt/airflow/dags
+      - ../airflow/logs:/opt/airflow/logs
+      - ../airflow/plugins:/opt/airflow/plugins
+      - ../scripts:/opt/airflow/scripts
+      - ../data:/opt/airflow/data
+      - ./requirements.txt:/requirements.txt
+    ports:
+      - "8080:8080"
+    command: >
+      bash -c "
+      sleep 20 &&
+      pip install -r /requirements.txt &&
+      airflow db upgrade &&
+      airflow users create \
+        --username admin \
+        --password admin \
+        --firstname Admin \
+        --lastname User \
+        --role Admin \
+        --email admin@example.com || true &&
+      airflow scheduler & \
+      exec airflow webserver"
+    restart: always
+
+  airflow-worker:
+    platform: linux/amd64
+    image: apache/airflow:2.5.1
+    container_name: docker-airflow-worker-1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      airflow:
+        condition: service_started
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__FERNET_KEY=1FLtxEd86qp5JsDbDJz9M0eZ7dLErNfTR79Bp22yX60=
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__LOGGING__LOGGING_LEVEL=INFO
+    volumes:
+      - ../airflow/dags:/opt/airflow/dags
+      - ../airflow/logs:/opt/airflow/logs
+      - ../airflow/plugins:/opt/airflow/plugins
+      - ../scripts:/opt/airflow/scripts
+      - ../data:/opt/airflow/data
+      - ./requirements.txt:/requirements.txt
+    command: >
+      bash -c "sleep 20 && \
+      pip install -r /requirements.txt && \
+      airflow celery worker"
+    restart: always
+
+volumes:
+  postgres_data:
+  solr_data:
