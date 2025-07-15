@@ -5,12 +5,12 @@ def format_csv(input_path: str, output_path: str):
     df = df.dropna(subset=['Nome', 'Data de Nascimento'])
     df['Nome'] = df['Nome'].str.strip().str.title()
     df['Data de Nascimento'] = pd.to_datetime(df['Data de Nascimento'], errors='coerce')
-    hoje = pd.Timestamp('today')
+    hoje = pd.Timestamp.today()
     df['Idade_Calc'] = ((hoje - df['Data de Nascimento']).dt.days // 365)
+    df = df[df['Idade'] == df['Idade_Calc']]  # Isso evita registros inconsistentes
     df.to_csv(output_path, index=False)
 
 if __name__ == "__main__":
     import sys
     _, inp, outp = sys.argv
     format_csv(inp, outp)
-

@@ -1,6 +1,8 @@
 from airflow import DAG
-from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
+from scripts.format_csv import format_csv
+from scripts.load_to_solr import load_to_solr
 
 default_args = {
     'owner': 'airflow',
@@ -10,29 +12,29 @@ default_args = {
 }
 
 with DAG(
-    'solr_pipeline',
+    dag_id='solr_pipeline',
     description='Formata CSV e carrega no Solr toda semana',
     schedule_interval='@weekly',
     default_args=default_args,
     catchup=False
 ) as dag:
 
-    format_task = BashOperator(
+    format_task = PythonOperator(
         task_id='format_csv',
-        bash_command=(
-            'python /opt/airflow/scripts/format_csv.py '
-            '/opt/airflow/data/alunos.csv '
-            '/opt/airflow/data/alunos_clean.csv '
-        )
+        python_callable=format_csv,
+        op_kwargs={
+            'input_path': '/opt/airflow/data/alunos.csv',
+            'output_path': '/opt/airflow/data/alunos_clean.csv'
+        }
     )
 
-    load_task = BashOperator(
+    load_task = PythonOperator(
         task_id='load_to_solr',
-        bash_command=(
-            'python /opt/airflow/scripts/load_to_solr.py '
-            'http://solr_instance:8983/solr/alunos_collection '
-            '/opt/airflow/data/alunos_clean.csv'
-        )
+        python_callable=load_to_solr,
+        op_kwargs={
+            'solr_url': 'http://solr_instance:8983/solr/alunos_collection',
+            'csv_path': '/opt/airflow/data/alunos_clean.csv'
+        }
     )
 
     format_task >> load_task
